@@ -39,6 +39,72 @@ frappe.ui.form.on("PDC Cheque", {
         frm.trigger("add_action_buttons");
         frm.trigger("set_fields_read_only");
         frm.trigger("show_maturity_alert");
+        frm.trigger("update_allocation_totals");
+
+        // "Get Outstanding Invoices" button — only on draft forms with a party selected
+        if (frm.doc.docstatus === 0 && frm.doc.party && frm.doc.company) {
+            frm.add_custom_button(__("Get Outstanding Invoices"), () => {
+                frm.trigger("fetch_outstanding_invoices");
+            });
+        }
+    },
+
+    // ── FETCH OUTSTANDING INVOICES ─────────────────────────────────────────
+    fetch_outstanding_invoices(frm) {
+        if (!frm.doc.party || !frm.doc.company || !frm.doc.party_type) {
+            frappe.msgprint(__("Please select Party and Company first."));
+            return;
+        }
+        frappe.show_alert({ message: __("Fetching outstanding invoices…"), indicator: "blue" });
+        frappe.call({
+            method: "pdc_management.pdc_management.doctype.pdc_cheque.pdc_cheque.get_outstanding_invoices_for_party",
+            args: {
+                party_type: frm.doc.party_type,
+                party: frm.doc.party,
+                company: frm.doc.company,
+                currency: frm.doc.currency || null
+            },
+            callback(r) {
+                if (!r.message) return;
+                const { invoices, total_outstanding } = r.message;
+
+                if (!invoices.length) {
+                    frappe.msgprint(__("No outstanding invoices found for this party."));
+                    return;
+                }
+
+                frm.clear_table("references");
+                invoices.forEach(inv => {
+                    const row = frm.add_child("references");
+                    row.reference_doctype  = inv.reference_doctype;
+                    row.reference_document = inv.reference_document;
+                    row.outstanding_amount = inv.outstanding_amount;
+                    row.allocated_amount   = inv.allocated_amount;
+                    row.due_date           = inv.due_date;
+                });
+                frm.refresh_field("references");
+                frm.set_value("total_outstanding", total_outstanding);
+                frm.trigger("update_allocation_totals");
+                frappe.show_alert({
+                    message: __(`${invoices.length} invoice(s) loaded.`),
+                    indicator: "green"
+                });
+            }
+        });
+    },
+
+    // ── ALLOCATION TOTALS ──────────────────────────────────────────────────
+    update_allocation_totals(frm) {
+        let total_allocated = 0;
+        (frm.doc.references || []).forEach(r => {
+            total_allocated += flt(r.allocated_amount);
+        });
+        frm.set_value("total_allocated", total_allocated);
+        frm.set_value("unallocated_amount", flt(frm.doc.amount) - total_allocated);
+    },
+
+    amount(frm) {
+        frm.trigger("update_allocation_totals");
     },
 
     // ── STATUS BADGE ───────────────────────────────────────────────────────
@@ -169,7 +235,6 @@ frappe.ui.form.on("PDC Cheque", {
                         ${card("BOUNCED",    totals.Bounced,    "#fee2e2", "#991b1b")}
                     </div>`;
 
-                // Append after the status badge
                 const wrapper = frm.get_field("status_html").$wrapper;
                 wrapper.find(".pdc-dashboard").remove();
                 wrapper.append(`<div class="pdc-dashboard">${html}</div>`);
@@ -250,7 +315,6 @@ frappe.ui.form.on("PDC Cheque", {
             }, __("PDC Actions")).css({ "background": "#7c3aed", "color": "white", "font-weight": "bold" });
         }
 
-        // ── Linked Document Shortcuts ──
         if (frm.doc.journal_entry) {
             frm.add_custom_button(__("📄 Deposit JE"), () => {
                 frappe.set_route("Form", "Journal Entry", frm.doc.journal_entry);
@@ -284,7 +348,8 @@ frappe.ui.form.on("PDC Cheque", {
         frm.trigger("set_party_type");
         frm.set_value("party", "");
         frm.set_value("party_account", "");
-        frm.set_value("customer_name", "");
+        frm.set_value("party_name", "");
+        frm.set_value("total_outstanding", 0);
     },
 
     // ── DAYS TO MATURITY ───────────────────────────────────────────────────
@@ -299,31 +364,50 @@ frappe.ui.form.on("PDC Cheque", {
         }
     },
 
-    // ── PARTY ACCOUNT AUTO-FETCH ───────────────────────────────────────────
+    // ── PARTY SELECTED ─────────────────────────────────────────────────────
     party(frm) {
-        if (frm.doc.party && frm.doc.party_type && frm.doc.company) {
-            frappe.call({
-                method: "erpnext.accounts.party.get_party_account",
-                args: {
-                    party_type: frm.doc.party_type,
-                    party: frm.doc.party,
-                    company: frm.doc.company
-                },
-                callback(r) {
-                    if (r.message) frm.set_value("party_account", r.message);
-                }
-            });
-            if (frm.doc.party_type === "Customer") {
-                frappe.db.get_value("Customer", frm.doc.party, "customer_name", r => {
-                    frm.set_value("customer_name", r && r.customer_name || "");
-                });
-            } else {
-                frm.set_value("customer_name", "");
-            }
-            frm.trigger("render_party_dashboard");
-        } else {
-            frm.set_value("customer_name", "");
+        if (!frm.doc.party || !frm.doc.party_type || !frm.doc.company) {
+            frm.set_value("party_name", "");
+            frm.set_value("total_outstanding", 0);
+            return;
         }
+
+        // Fetch party display name (works for both Customer and Supplier)
+        const nameField = frm.doc.party_type === "Customer" ? "customer_name" : "supplier_name";
+        frappe.db.get_value(frm.doc.party_type, frm.doc.party, nameField, r => {
+            frm.set_value("party_name", r && r[nameField] || "");
+        });
+
+        // Fetch party ledger account
+        frappe.call({
+            method: "erpnext.accounts.party.get_party_account",
+            args: {
+                party_type: frm.doc.party_type,
+                party: frm.doc.party,
+                company: frm.doc.company
+            },
+            callback(r) {
+                if (r.message) frm.set_value("party_account", r.message);
+            }
+        });
+
+        // Fetch total outstanding balance for the party
+        frappe.call({
+            method: "pdc_management.pdc_management.doctype.pdc_cheque.pdc_cheque.get_outstanding_invoices_for_party",
+            args: {
+                party_type: frm.doc.party_type,
+                party: frm.doc.party,
+                company: frm.doc.company,
+                currency: frm.doc.currency || null
+            },
+            callback(r) {
+                if (r.message) {
+                    frm.set_value("total_outstanding", r.message.total_outstanding);
+                }
+            }
+        });
+
+        frm.trigger("render_party_dashboard");
     },
 
     // ── AUTO SET COST CENTER ───────────────────────────────────────────────
@@ -356,7 +440,7 @@ frappe.ui.form.on("PDC Cheque Invoice", {
             method: "frappe.client.get_value",
             args: {
                 doctype: row.reference_doctype,
-                fieldname: "outstanding_amount",
+                fieldname: ["outstanding_amount", "due_date"],
                 filters: { name: row.reference_document }
             },
             callback(r) {
@@ -365,9 +449,20 @@ frappe.ui.form.on("PDC Cheque Invoice", {
                         r.message.outstanding_amount);
                     frappe.model.set_value(cdt, cdn, "allocated_amount",
                         r.message.outstanding_amount);
+                    if (r.message.due_date) {
+                        frappe.model.set_value(cdt, cdn, "due_date", r.message.due_date);
+                    }
                 }
             }
         });
+    },
+
+    allocated_amount(frm) {
+        frm.trigger("update_allocation_totals");
+    },
+
+    references_remove(frm) {
+        frm.trigger("update_allocation_totals");
     }
 });
 

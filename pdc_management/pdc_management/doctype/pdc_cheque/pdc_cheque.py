@@ -14,9 +14,11 @@ class PDCCheque(Document):
         self.validate_party_vs_type()
         self.validate_duplicate()
         self.set_party_account()
+        self.set_party_name()
         self.set_amount_in_words()
         self.set_days_to_maturity()
         self.validate_allocated_amount()
+        self.update_allocation_totals()
         if self.docstatus == 0:
             self.status = "Draft"
 
@@ -51,6 +53,13 @@ class PDCCheque(Document):
             except Exception:
                 pass
 
+    def set_party_name(self):
+        if not self.party or not self.party_type:
+            self.party_name = ""
+            return
+        name_field = "customer_name" if self.party_type == "Customer" else "supplier_name"
+        self.party_name = frappe.db.get_value(self.party_type, self.party, name_field) or ""
+
     def set_amount_in_words(self):
         if self.amount:
             self.amount_in_words = in_words(self.amount)
@@ -68,6 +77,11 @@ class PDCCheque(Document):
                 "Total Allocated Amount <b>{0}</b> cannot exceed "
                 "Cheque Amount <b>{1}</b>"
             ).format(total_allocated, self.amount))
+
+    def update_allocation_totals(self):
+        total_allocated = sum(flt(r.allocated_amount) for r in (self.references or []))
+        self.total_allocated = total_allocated
+        self.unallocated_amount = flt(self.amount) - total_allocated
 
     # ─────────────────────────────────────────
     # ON SUBMIT
@@ -123,7 +137,6 @@ class PDCCheque(Document):
             f"Amount: {self.amount} {self.currency}"
         )
 
-        # Get references for JE
         ref_type = ""
         ref_name = ""
         if self.references and len(self.references) == 1:
@@ -131,7 +144,6 @@ class PDCCheque(Document):
             ref_name = self.references[0].reference_document
 
         if self.cheque_type == "Receivable":
-            # DR: PDC Clearing  CR: Customer AR
             je.append("accounts", {
                 "account": clearing,
                 "debit_in_account_currency": flt(self.amount),
@@ -150,7 +162,6 @@ class PDCCheque(Document):
                 "user_remark": f"PDC Received — {self.cheque_number}"
             })
         else:
-            # DR: Supplier AP  CR: PDC Clearing
             je.append("accounts", {
                 "account": party_acc,
                 "party_type": "Supplier",
@@ -193,7 +204,6 @@ class PDCCheque(Document):
     def mark_as_cleared(self):
         if self.status != "Deposited":
             frappe.throw(_("Only <b>Deposited</b> cheques can be cleared."))
-        # Try to get default bank from PDC Settings
         if not self.bank_account:
             from pdc_management.pdc_management.utils import get_default_bank_account
             self.bank_account = get_default_bank_account(self.company)
@@ -219,7 +229,6 @@ class PDCCheque(Document):
         )
 
         if self.cheque_type == "Receivable":
-            # DR: Bank  CR: PDC Clearing
             je.append("accounts", {
                 "account": self.bank_account,
                 "debit_in_account_currency": flt(self.amount),
@@ -233,7 +242,6 @@ class PDCCheque(Document):
                 "user_remark": f"PDC Clearing Settled — {self.cheque_number}"
             })
         else:
-            # DR: PDC Clearing  CR: Bank
             je.append("accounts", {
                 "account": clearing,
                 "debit_in_account_currency": flt(self.amount),
@@ -315,7 +323,6 @@ class PDCCheque(Document):
     # ─────────────────────────────────────────
     @frappe.whitelist()
     def mark_as_re_presented(self):
-        """Re-present a bounced cheque — resets to Registered."""
         if self.status != "Bounced":
             frappe.throw(_("Only <b>Bounced</b> cheques can be re-presented."))
         self.db_set("status", "Registered")
@@ -342,12 +349,51 @@ class PDCCheque(Document):
 
 
 # ─────────────────────────────────────────────
+# API — outstanding invoices for party
+# ─────────────────────────────────────────────
+
+@frappe.whitelist()
+def get_outstanding_invoices_for_party(party_type, party, company, currency=None):
+    """Return all outstanding invoices and the total outstanding for a party."""
+    doctype = "Sales Invoice" if party_type == "Customer" else "Purchase Invoice"
+    party_field = "customer" if party_type == "Customer" else "supplier"
+
+    filters = {
+        party_field: party,
+        "docstatus": 1,
+        "outstanding_amount": [">", 0],
+        "company": company,
+    }
+    if currency:
+        filters["currency"] = currency
+
+    rows = frappe.get_all(
+        doctype,
+        filters=filters,
+        fields=["name", "outstanding_amount", "due_date"],
+        order_by="due_date asc",
+    )
+
+    invoices = [{
+        "reference_doctype": doctype,
+        "reference_document": r.name,
+        "outstanding_amount": flt(r.outstanding_amount),
+        "allocated_amount": flt(r.outstanding_amount),
+        "due_date": r.due_date,
+    } for r in rows]
+
+    return {
+        "invoices": invoices,
+        "total_outstanding": sum(flt(r.outstanding_amount) for r in rows),
+    }
+
+
+# ─────────────────────────────────────────────
 # API — used by reports and dashboard
 # ─────────────────────────────────────────────
 
 @frappe.whitelist()
 def get_pdc_summary(company=None):
-    """Returns PDC summary counts and totals for dashboard."""
     filters = {"docstatus": 1}
     if company:
         filters["company"] = company
@@ -384,7 +430,6 @@ def get_pdc_summary(company=None):
 
 @frappe.whitelist()
 def get_maturing_cheques(days=7, company=None):
-    """Returns cheques maturing in the next X days."""
     filters = {
         "status": "Registered",
         "docstatus": 1,
@@ -401,11 +446,10 @@ def get_maturing_cheques(days=7, company=None):
 
 
 # ─────────────────────────────────────────────
-# SCHEDULED TASK
+# SCHEDULED TASKS
 # ─────────────────────────────────────────────
 
 def auto_process_matured_cheques():
-    """Runs daily — auto-deposits matured cheques."""
     cheques = frappe.get_all("PDC Cheque",
         filters={
             "status": "Registered",
@@ -426,7 +470,6 @@ def auto_process_matured_cheques():
 
 
 def send_maturity_notifications():
-    """Runs daily — sends email alerts for cheques maturing soon."""
     cheques = frappe.get_all("PDC Cheque",
         filters={
             "status": "Registered",
@@ -458,8 +501,7 @@ def send_maturity_notifications():
                         <p>This cheque is due for deposit in {days_before} days.</p>
                     """
                 )
-                frappe.db.set_value("PDC Cheque", c.name,
-                    "notification_sent", 1)
+                frappe.db.set_value("PDC Cheque", c.name, "notification_sent", 1)
                 frappe.db.set_value("PDC Cheque", c.name,
                     "last_notification_date", today())
             except Exception:

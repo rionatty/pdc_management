@@ -20,10 +20,11 @@
     {"fieldname":"section_party","fieldtype":"Section Break","label":"Party Information"},
     {"fieldname":"party_type","fieldtype":"Select","label":"Party Type","options":"Customer\nSupplier","reqd":1},
     {"fieldname":"party","fieldtype":"Dynamic Link","label":"Party","options":"party_type","reqd":1,"in_list_view":1,"in_standard_filter":1,"bold":1},
-    {"fieldname":"customer_name","fieldtype":"Data","label":"Customer Name","read_only":1},
+    {"fieldname":"party_name","fieldtype":"Data","label":"Party Name","read_only":1},
     {"fieldname":"col_break_2","fieldtype":"Column Break"},
     {"fieldname":"party_account","fieldtype":"Link","label":"Party Account","options":"Account","read_only":1},
     {"fieldname":"cost_center","fieldtype":"Link","label":"Cost Center","options":"Cost Center"},
+    {"fieldname":"total_outstanding","fieldtype":"Currency","label":"Total Outstanding Balance","read_only":1,"options":"currency","bold":1},
 
     {"fieldname":"section_cheque","fieldtype":"Section Break","label":"Cheque Details"},
     {"fieldname":"cheque_number","fieldtype":"Data","label":"Cheque Number","reqd":1,"in_list_view":1,"bold":1},
@@ -48,6 +49,11 @@
     {"fieldname":"section_reference","fieldtype":"Section Break","label":"Invoice References"},
     {"fieldname":"references","fieldtype":"Table","label":"Invoice References","options":"PDC Cheque Invoice"},
     {"fieldname":"remarks","fieldtype":"Small Text","label":"Remarks"},
+
+    {"fieldname":"section_alloc_totals","fieldtype":"Section Break","label":"Allocation Summary"},
+    {"fieldname":"total_allocated","fieldtype":"Currency","label":"Total Allocated","read_only":1,"options":"currency","bold":1},
+    {"fieldname":"col_break_alloc","fieldtype":"Column Break"},
+    {"fieldname":"unallocated_amount","fieldtype":"Currency","label":"Unallocated Amount","read_only":1,"options":"currency","bold":1},
 
     {"fieldname":"section_dates","fieldtype":"Section Break","label":"Transaction Dates","collapsible":1},
     {"fieldname":"deposit_date","fieldtype":"Date","label":"Deposit Date","read_only":1},
