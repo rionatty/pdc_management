@@ -1,0 +1,17 @@
+{
+  "doctype": "DocType",
+  "name": "PDC Cheque Log",
+  "module": "PDC Management",
+  "is_submittable": 0,
+  "fields": [
+    {"fieldname":"pdc_cheque","fieldtype":"Link","label":"PDC Cheque","options":"PDC Cheque","reqd":1},
+    {"fieldname":"status","fieldtype":"Select","label":"Status","options":"Draft\nRegistered\nDeposited\nCleared\nBounced\nCancelled"},
+    {"fieldname":"date","fieldtype":"Date","label":"Date"},
+    {"fieldname":"changed_by","fieldtype":"Link","label":"Changed By","options":"User"},
+    {"fieldname":"remarks","fieldtype":"Text","label":"Remarks"}
+  ],
+  "permissions": [
+    {"role":"Accounts Manager","read":1,"write":1,"create":1},
+    {"role":"Accounts User","read":1}
+  ]
+}

@@ -1,0 +1,15 @@
+{
+  "doctype": "DocType",
+  "name": "PDC Cheque Invoice",
+  "module": "PDC Management",
+  "is_submittable": 0,
+  "istable": 1,
+  "fields": [
+    {"fieldname":"reference_doctype","fieldtype":"Select","label":"Document Type","options":"Sales Invoice\nPurchase Invoice\nJournal Entry","reqd":1,"in_list_view":1},
+    {"fieldname":"reference_document","fieldtype":"Dynamic Link","label":"Document","options":"reference_doctype","reqd":1,"in_list_view":1},
+    {"fieldname":"outstanding_amount","fieldtype":"Currency","label":"Outstanding Amount","in_list_view":1},
+    {"fieldname":"allocated_amount","fieldtype":"Currency","label":"Allocated Amount","reqd":1,"in_list_view":1},
+    {"fieldname":"due_date","fieldtype":"Date","label":"Due Date","in_list_view":1}
+  ],
+  "permissions": []
+}

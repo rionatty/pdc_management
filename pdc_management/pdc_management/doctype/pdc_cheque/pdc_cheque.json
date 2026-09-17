@@ -1,0 +1,74 @@
+{
+  "doctype": "DocType",
+  "name": "PDC Cheque",
+  "module": "PDC Management",
+  "is_submittable": 1,
+  "track_changes": 1,
+  "title_field": "cheque_number",
+  "autoname": "format:PDC-{cheque_type:.3}-{######}",
+  "fields": [
+
+    {"fieldname":"status_html","fieldtype":"HTML","label":"Status HTML"},
+
+    {"fieldname":"section_type","fieldtype":"Section Break","label":"Cheque Type & Status"},
+    {"fieldname":"cheque_type","fieldtype":"Select","label":"Cheque Type","options":"Receivable\nPayable","reqd":1,"in_list_view":1,"bold":1},
+    {"fieldname":"status","fieldtype":"Select","label":"Status","options":"Draft\nRegistered\nDeposited\nCleared\nBounced\nCancelled","default":"Draft","read_only":1,"in_list_view":1,"in_standard_filter":1,"bold":1},
+    {"fieldname":"col_break_1","fieldtype":"Column Break"},
+    {"fieldname":"company","fieldtype":"Link","label":"Company","options":"Company","reqd":1},
+    {"fieldname":"currency","fieldtype":"Link","label":"Currency","options":"Currency","reqd":1},
+
+    {"fieldname":"section_party","fieldtype":"Section Break","label":"Party Information"},
+    {"fieldname":"party_type","fieldtype":"Select","label":"Party Type","options":"Customer\nSupplier","reqd":1},
+    {"fieldname":"party","fieldtype":"Dynamic Link","label":"Party","options":"party_type","reqd":1,"in_list_view":1,"in_standard_filter":1,"bold":1},
+    {"fieldname":"customer_name","fieldtype":"Data","label":"Customer Name","read_only":1},
+    {"fieldname":"col_break_2","fieldtype":"Column Break"},
+    {"fieldname":"party_account","fieldtype":"Link","label":"Party Account","options":"Account","read_only":1},
+    {"fieldname":"cost_center","fieldtype":"Link","label":"Cost Center","options":"Cost Center"},
+
+    {"fieldname":"section_cheque","fieldtype":"Section Break","label":"Cheque Details"},
+    {"fieldname":"cheque_number","fieldtype":"Data","label":"Cheque Number","reqd":1,"in_list_view":1,"bold":1},
+    {"fieldname":"cheque_date","fieldtype":"Date","label":"Cheque Date (Maturity Date)","reqd":1,"in_list_view":1,"in_standard_filter":1,"bold":1},
+    {"fieldname":"amount","fieldtype":"Currency","label":"Amount","reqd":1,"in_list_view":1,"options":"currency","bold":1},
+    {"fieldname":"amount_in_words","fieldtype":"Data","label":"Amount in Words","read_only":1},
+    {"fieldname":"col_break_3","fieldtype":"Column Break"},
+    {"fieldname":"receipt_date","fieldtype":"Date","label":"Receipt / Issue Date","reqd":1},
+    {"fieldname":"micr_number","fieldtype":"Data","label":"MICR Number"},
+    {"fieldname":"cheque_account_number","fieldtype":"Data","label":"Cheque Account Number"},
+    {"fieldname":"days_to_maturity","fieldtype":"Int","label":"Days to Maturity","read_only":1},
+
+    {"fieldname":"section_bank","fieldtype":"Section Break","label":"Bank Information"},
+    {"fieldname":"bank_name","fieldtype":"Data","label":"Drawer Bank Name","reqd":1},
+    {"fieldname":"bank_branch","fieldtype":"Data","label":"Bank Branch"},
+    {"fieldname":"bank_city","fieldtype":"Data","label":"Bank City"},
+    {"fieldname":"col_break_4","fieldtype":"Column Break"},
+    {"fieldname":"bank_account","fieldtype":"Link","label":"Deposit To (Our Bank Account)","options":"Account"},
+    {"fieldname":"deposit_slip_number","fieldtype":"Data","label":"Deposit Slip Number"},
+    {"fieldname":"bank_reference","fieldtype":"Data","label":"Bank Reference Number"},
+
+    {"fieldname":"section_reference","fieldtype":"Section Break","label":"Invoice References"},
+    {"fieldname":"references","fieldtype":"Table","label":"Invoice References","options":"PDC Cheque Invoice"},
+    {"fieldname":"remarks","fieldtype":"Small Text","label":"Remarks"},
+
+    {"fieldname":"section_dates","fieldtype":"Section Break","label":"Transaction Dates","collapsible":1},
+    {"fieldname":"deposit_date","fieldtype":"Date","label":"Deposit Date","read_only":1},
+    {"fieldname":"clearance_date","fieldtype":"Date","label":"Clearance Date","read_only":1},
+    {"fieldname":"bounce_date","fieldtype":"Date","label":"Bounce Date","read_only":1},
+    {"fieldname":"col_break_5","fieldtype":"Column Break"},
+    {"fieldname":"journal_entry","fieldtype":"Link","label":"Deposit Journal Entry","options":"Journal Entry","read_only":1},
+    {"fieldname":"clearance_journal_entry","fieldtype":"Link","label":"Clearance Journal Entry","options":"Journal Entry","read_only":1},
+    {"fieldname":"bounce_journal_entry","fieldtype":"Link","label":"Bounce Journal Entry","options":"Journal Entry","read_only":1},
+
+    {"fieldname":"section_notify","fieldtype":"Section Break","label":"Notifications","collapsible":1},
+    {"fieldname":"notify_days_before","fieldtype":"Int","label":"Notify Days Before Maturity","default":3},
+    {"fieldname":"notification_sent","fieldtype":"Check","label":"Maturity Notification Sent","read_only":1},
+    {"fieldname":"col_break_6","fieldtype":"Column Break"},
+    {"fieldname":"notify_email","fieldtype":"Data","label":"Notify Email"},
+    {"fieldname":"last_notification_date","fieldtype":"Date","label":"Last Notification Sent On","read_only":1}
+
+  ],
+  "permissions": [
+    {"role":"Accounts Manager","read":1,"write":1,"create":1,"delete":1,"submit":1,"cancel":1,"amend":1,"print":1,"report":1,"email":1},
+    {"role":"Accounts User","read":1,"write":1,"create":1,"submit":1,"print":1,"report":1,"email":1},
+    {"role":"System Manager","read":1,"write":1,"create":1,"delete":1,"submit":1,"cancel":1,"amend":1,"print":1}
+  ]
+}

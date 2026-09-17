@@ -1,0 +1,57 @@
+{
+  "doctype": "DocType",
+  "name": "PDC Company Settings",
+  "module": "PDC Management",
+  "istable": 1,
+  "is_submittable": 0,
+  "fields": [
+    {
+      "fieldname": "company",
+      "fieldtype": "Link",
+      "label": "Company",
+      "options": "Company",
+      "reqd": 1,
+      "in_list_view": 1,
+      "bold": 1
+    },
+    {
+      "fieldname": "col_break_1",
+      "fieldtype": "Column Break"
+    },
+    {
+      "fieldname": "pdc_receivable_account",
+      "fieldtype": "Link",
+      "label": "PDC Receivable Clearing Account",
+      "options": "Account",
+      "reqd": 1,
+      "in_list_view": 1,
+      "description": "Temporary account used when a customer PDC cheque is deposited"
+    },
+    {
+      "fieldname": "col_break_2",
+      "fieldtype": "Column Break"
+    },
+    {
+      "fieldname": "pdc_payable_account",
+      "fieldtype": "Link",
+      "label": "PDC Payable Clearing Account",
+      "options": "Account",
+      "reqd": 1,
+      "in_list_view": 1,
+      "description": "Temporary account used when a supplier PDC cheque is deposited"
+    },
+    {
+      "fieldname": "col_break_3",
+      "fieldtype": "Column Break"
+    },
+    {
+      "fieldname": "default_bank_account",
+      "fieldtype": "Link",
+      "label": "Default Bank Account",
+      "options": "Account",
+      "in_list_view": 1,
+      "description": "Default bank account used for clearance if not set on cheque"
+    }
+  ],
+  "permissions": []
+}

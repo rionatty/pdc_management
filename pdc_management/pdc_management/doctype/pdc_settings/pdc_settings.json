@@ -1,0 +1,117 @@
+{
+  "doctype": "DocType",
+  "name": "PDC Settings",
+  "module": "PDC Management",
+  "issingle": 1,
+  "is_submittable": 0,
+  "track_changes": 1,
+  "fields": [
+    {
+      "fieldname": "section_accounts",
+      "fieldtype": "Section Break",
+      "label": "Company Clearing Accounts"
+    },
+    {
+      "fieldname": "company_settings",
+      "fieldtype": "Table",
+      "label": "Company Settings",
+      "options": "PDC Company Settings",
+      "reqd": 1,
+      "description": "Configure PDC clearing accounts for each company"
+    },
+    {
+      "fieldname": "section_auto",
+      "fieldtype": "Section Break",
+      "label": "Automation Settings"
+    },
+    {
+      "fieldname": "auto_deposit_on_maturity",
+      "fieldtype": "Check",
+      "label": "Auto Deposit on Maturity Date",
+      "default": 0,
+      "description": "Automatically create deposit Journal Entry when cheque date arrives"
+    },
+    {
+      "fieldname": "col_break_auto",
+      "fieldtype": "Column Break"
+    },
+    {
+      "fieldname": "notify_before_days",
+      "fieldtype": "Int",
+      "label": "Send Notification (Days Before Maturity)",
+      "default": 3,
+      "description": "Send email notification X days before cheque maturity date"
+    },
+    {
+      "fieldname": "section_notify",
+      "fieldtype": "Section Break",
+      "label": "Notification Settings"
+    },
+    {
+      "fieldname": "enable_notifications",
+      "fieldtype": "Check",
+      "label": "Enable Email Notifications",
+      "default": 1
+    },
+    {
+      "fieldname": "notification_email",
+      "fieldtype": "Data",
+      "label": "Default Notification Email",
+      "options": "Email",
+      "description": "Default email to receive PDC maturity alerts"
+    },
+    {
+      "fieldname": "col_break_notify",
+      "fieldtype": "Column Break"
+    },
+    {
+      "fieldname": "notify_on_bounce",
+      "fieldtype": "Check",
+      "label": "Notify on Cheque Bounce",
+      "default": 1
+    },
+    {
+      "fieldname": "notify_on_clearance",
+      "fieldtype": "Check",
+      "label": "Notify on Cheque Clearance",
+      "default": 0
+    },
+    {
+      "fieldname": "section_numbering",
+      "fieldtype": "Section Break",
+      "label": "Naming & Numbering"
+    },
+    {
+      "fieldname": "cheque_naming_series",
+      "fieldtype": "Data",
+      "label": "Cheque Naming Series",
+      "default": "PDC-.{cheque_type:.3}-.######",
+      "description": "Naming series for PDC Cheque documents"
+    },
+    {
+      "fieldname": "col_break_naming",
+      "fieldtype": "Column Break"
+    },
+    {
+      "fieldname": "allow_duplicate_cheque_number",
+      "fieldtype": "Check",
+      "label": "Allow Duplicate Cheque Numbers",
+      "default": 0,
+      "description": "If checked, same cheque number can be used for different parties"
+    }
+  ],
+  "permissions": [
+    {
+      "role": "Accounts Manager",
+      "read": 1,
+      "write": 1,
+      "create": 1
+    },
+    {
+      "role": "System Manager",
+      "read": 1,
+      "write": 1,
+      "create": 1
+    }
+  ]
+}
