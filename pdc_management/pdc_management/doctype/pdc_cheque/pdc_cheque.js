@@ -79,12 +79,16 @@ frappe.ui.form.on("PDC Cheque", {
                     row.reference_doctype  = inv.reference_doctype;
                     row.reference_document = inv.reference_document;
                     row.outstanding_amount = inv.outstanding_amount;
-                    row.allocated_amount   = inv.allocated_amount;
+                    row.allocated_amount   = 0;
                     row.due_date           = inv.due_date;
                 });
                 frm.refresh_field("references");
                 frm.set_value("total_outstanding", total_outstanding);
-                frm.trigger("update_allocation_totals");
+                if (flt(frm.doc.amount) > 0) {
+                    frm.trigger("auto_allocate");
+                } else {
+                    frm.trigger("update_allocation_totals");
+                }
                 frappe.show_alert({
                     message: __(`${invoices.length} invoice(s) loaded.`),
                     indicator: "green"
@@ -104,6 +108,23 @@ frappe.ui.form.on("PDC Cheque", {
     },
 
     amount(frm) {
+        if (frm.doc.references && frm.doc.references.length) {
+            frm.trigger("auto_allocate");
+        } else {
+            frm.trigger("update_allocation_totals");
+        }
+    },
+
+    // ── AUTO ALLOCATE ──────────────────────────────────────────────────────
+    // Distributes cheque amount across references oldest-first (like Payment Entry)
+    auto_allocate(frm) {
+        let remaining = flt(frm.doc.amount);
+        (frm.doc.references || []).forEach(row => {
+            const can_allocate = Math.min(remaining, flt(row.outstanding_amount));
+            frappe.model.set_value(row.doctype, row.name, "allocated_amount", can_allocate);
+            remaining = Math.max(0, remaining - can_allocate);
+        });
+        frm.refresh_field("references");
         frm.trigger("update_allocation_totals");
     },
 
@@ -391,7 +412,8 @@ frappe.ui.form.on("PDC Cheque", {
             }
         });
 
-        // Fetch total outstanding balance for the party
+        // Auto-fetch outstanding invoices and populate references table
+        frappe.show_alert({ message: __("Loading outstanding invoices…"), indicator: "blue" });
         frappe.call({
             method: "pdc_management.pdc_management.doctype.pdc_cheque.pdc_cheque.get_outstanding_invoices_for_party",
             args: {
@@ -401,8 +423,28 @@ frappe.ui.form.on("PDC Cheque", {
                 currency: frm.doc.currency || null
             },
             callback(r) {
-                if (r.message) {
-                    frm.set_value("total_outstanding", r.message.total_outstanding);
+                if (!r.message) return;
+                const { invoices, total_outstanding } = r.message;
+
+                frm.set_value("total_outstanding", total_outstanding);
+
+                // Populate references table
+                frm.clear_table("references");
+                invoices.forEach(inv => {
+                    const row = frm.add_child("references");
+                    row.reference_doctype  = inv.reference_doctype;
+                    row.reference_document = inv.reference_document;
+                    row.outstanding_amount = inv.outstanding_amount;
+                    row.allocated_amount   = 0;  // will be set by auto-allocate
+                    row.due_date           = inv.due_date;
+                });
+                frm.refresh_field("references");
+
+                // Auto-allocate if amount is already filled
+                if (flt(frm.doc.amount) > 0) {
+                    frm.trigger("auto_allocate");
+                } else {
+                    frm.trigger("update_allocation_totals");
                 }
             }
         });
