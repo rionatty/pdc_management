@@ -44,57 +44,9 @@ frappe.ui.form.on("PDC Cheque", {
         // "Get Outstanding Invoices" button — only on draft forms with a party selected
         if (frm.doc.docstatus === 0 && frm.doc.party && frm.doc.company) {
             frm.add_custom_button(__("Get Outstanding Invoices"), () => {
-                frm.trigger("fetch_outstanding_invoices");
+                frm.trigger("load_outstanding_invoices");
             });
         }
-    },
-
-    // ── FETCH OUTSTANDING INVOICES ─────────────────────────────────────────
-    fetch_outstanding_invoices(frm) {
-        if (!frm.doc.party || !frm.doc.company || !frm.doc.party_type) {
-            frappe.msgprint(__("Please select Party and Company first."));
-            return;
-        }
-        frappe.show_alert({ message: __("Fetching outstanding invoices…"), indicator: "blue" });
-        frappe.call({
-            method: "pdc_management.pdc_management.doctype.pdc_cheque.pdc_cheque.get_outstanding_invoices_for_party",
-            args: {
-                party_type: frm.doc.party_type,
-                party: frm.doc.party,
-                company: frm.doc.company,
-                currency: frm.doc.currency || null
-            },
-            callback(r) {
-                if (!r.message) return;
-                const { invoices, total_outstanding } = r.message;
-
-                if (!invoices.length) {
-                    frappe.msgprint(__("No outstanding invoices found for this party."));
-                    return;
-                }
-
-                frm.clear_table("references");
-                invoices.forEach(inv => {
-                    const row = frm.add_child("references");
-                    row.reference_doctype  = inv.reference_doctype;
-                    row.reference_document = inv.reference_document;
-                    row.outstanding_amount = inv.outstanding_amount;
-                    row.allocated_amount   = 0;
-                    row.due_date           = inv.due_date;
-                });
-                frm.refresh_field("references");
-                frm.set_value("total_outstanding", total_outstanding);
-                if (flt(frm.doc.amount) > 0) {
-                    frm.trigger("auto_allocate");
-                } else {
-                    frm.trigger("update_allocation_totals");
-                }
-                frappe.show_alert({
-                    message: __(`${invoices.length} invoice(s) loaded.`),
-                    indicator: "green"
-                });
-            }
-        });
     },
 
     // ── ALLOCATION TOTALS ──────────────────────────────────────────────────
@@ -387,9 +339,12 @@ frappe.ui.form.on("PDC Cheque", {
 
     // ── PARTY SELECTED ─────────────────────────────────────────────────────
     party(frm) {
-        if (!frm.doc.party || !frm.doc.party_type || !frm.doc.company) {
+        if (!frm.doc.party || !frm.doc.party_type) {
             frm.set_value("party_name", "");
             frm.set_value("total_outstanding", 0);
+            frm.clear_table("references");
+            frm.refresh_field("references");
+            frm.trigger("update_allocation_totals");
             return;
         }
 
@@ -399,65 +354,83 @@ frappe.ui.form.on("PDC Cheque", {
             frm.set_value("party_name", r && r[nameField] || "");
         });
 
-        // Fetch party ledger account
-        frappe.call({
-            method: "erpnext.accounts.party.get_party_account",
-            args: {
-                party_type: frm.doc.party_type,
-                party: frm.doc.party,
-                company: frm.doc.company
-            },
-            callback(r) {
-                if (r.message) frm.set_value("party_account", r.message);
-            }
-        });
+        // Fetch party ledger account (needs company)
+        if (frm.doc.company) {
+            frappe.call({
+                method: "erpnext.accounts.party.get_party_account",
+                args: {
+                    party_type: frm.doc.party_type,
+                    party: frm.doc.party,
+                    company: frm.doc.company
+                },
+                callback(r) {
+                    if (r.message) frm.set_value("party_account", r.message);
+                }
+            });
+        }
 
-        // Auto-fetch outstanding invoices and populate references table
+        frm.trigger("load_outstanding_invoices");
+        frm.trigger("render_party_dashboard");
+    },
+
+    // ── LOAD OUTSTANDING INVOICES ──────────────────────────────────────────
+    load_outstanding_invoices(frm) {
+        if (!frm.doc.party || !frm.doc.party_type || !frm.doc.company) return;
+
         frappe.show_alert({ message: __("Loading outstanding invoices…"), indicator: "blue" });
         frappe.call({
             method: "pdc_management.pdc_management.doctype.pdc_cheque.pdc_cheque.get_outstanding_invoices_for_party",
             args: {
                 party_type: frm.doc.party_type,
-                party: frm.doc.party,
-                company: frm.doc.company,
-                currency: frm.doc.currency || null
+                party:      frm.doc.party,
+                company:    frm.doc.company,
+                currency:   frm.doc.currency || null
             },
             callback(r) {
                 if (!r.message) return;
                 const { invoices, total_outstanding } = r.message;
 
                 frm.set_value("total_outstanding", total_outstanding);
-
-                // Populate references table
                 frm.clear_table("references");
+
                 invoices.forEach(inv => {
                     const row = frm.add_child("references");
                     row.reference_doctype  = inv.reference_doctype;
                     row.reference_document = inv.reference_document;
                     row.outstanding_amount = inv.outstanding_amount;
-                    row.allocated_amount   = 0;  // will be set by auto-allocate
+                    row.allocated_amount   = 0;
                     row.due_date           = inv.due_date;
                 });
                 frm.refresh_field("references");
 
-                // Auto-allocate if amount is already filled
                 if (flt(frm.doc.amount) > 0) {
                     frm.trigger("auto_allocate");
                 } else {
                     frm.trigger("update_allocation_totals");
                 }
+
+                frappe.show_alert({
+                    message: invoices.length
+                        ? __(`${invoices.length} outstanding invoice(s) loaded.`)
+                        : __("No outstanding invoices found for this party."),
+                    indicator: invoices.length ? "green" : "orange"
+                });
+            },
+            error() {
+                frappe.show_alert({ message: __("Failed to load invoices. Check console."), indicator: "red" });
             }
         });
-
-        frm.trigger("render_party_dashboard");
     },
 
-    // ── AUTO SET COST CENTER ───────────────────────────────────────────────
+    // ── AUTO SET COST CENTER + RE-FETCH INVOICES ───────────────────────────
     company(frm) {
-        if (frm.doc.company) {
-            frappe.db.get_value("Company", frm.doc.company, "cost_center", r => {
-                if (r && r.cost_center) frm.set_value("cost_center", r.cost_center);
-            });
+        if (!frm.doc.company) return;
+        frappe.db.get_value("Company", frm.doc.company, "cost_center", r => {
+            if (r && r.cost_center) frm.set_value("cost_center", r.cost_center);
+        });
+        // If party was already selected before company, fetch invoices now
+        if (frm.doc.party) {
+            frm.trigger("load_outstanding_invoices");
         }
     },
 
